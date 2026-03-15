@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "75426083955",
+    "project_id": "gooddeeds1-2f4e5",
+    "storage_bucket": "gooddeeds1-2f4e5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:75426083955:android:77df457578401a304b6606",
+        "android_client_info": {
+          "package_name": "com.example.gooddeeds_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnkSowcdrNPNE8KXQ4u0bBp4rBJ01iz4U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
