@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/welcome_screen.dart';
+import 'screens/organizer/organizer_dashboard_screen.dart';
+import 'screens/organizer/manage_event_screen.dart';
+import 'screens/organizer/participants_screen.dart';
+import 'screens/user/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

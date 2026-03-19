@@ -31,7 +31,8 @@ class MyEventsScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => const CreateEventScreen()),
+                  builder: (context) => const CreateEventScreen(),
+                ),
               );
             },
             icon: const Icon(Icons.add, color: Colors.white),
@@ -48,6 +49,7 @@ class MyEventsScreen extends StatelessWidget {
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
+
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -72,7 +74,7 @@ class MyEventsScreen extends StatelessWidget {
                   .map((doc) => doc['eventId'].toString())
                   .toSet();
 
-              // Filter: events created by user OR joined by user
+              // Events created OR joined
               final List<Event> myEvents = allEvents
                   .where((e) =>
                       e.creatorId == currentUser.uid ||
@@ -93,16 +95,21 @@ class MyEventsScreen extends StatelessWidget {
                     child: ListTile(
                       title: Text(event.title),
                       subtitle: Text(
-                          'Volunteers: ${event.volunteers}  |  Points: ${event.points}'),
+                        'Volunteers: ${event.volunteers}  |  Points: ${event.points}',
+                      ),
+
+                      // ✅ ONLY LEAVE BUTTON (NO DELETE ANYMORE)
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Leave button (only for joined events not created by user)
-                          if (isJoined && !isCreator)
+                          if (!isCreator && isJoined)
                             IconButton(
-                              icon: const Icon(Icons.exit_to_app,
-                                  color: Colors.orange),
+                              icon: const Icon(
+                                Icons.exit_to_app,
+                                color: Colors.orange,
+                              ),
                               onPressed: () async {
+                                // Remove from user_events
                                 final userEventsQuery = await FirebaseFirestore
                                     .instance
                                     .collection('user_events')
@@ -122,7 +129,7 @@ class MyEventsScreen extends StatelessWidget {
                                   'points': FieldValue.increment(-event.points),
                                 }, SetOptions(merge: true));
 
-                                // Decrease volunteers
+                                // Decrease volunteers count
                                 await FirebaseFirestore.instance
                                     .collection('events')
                                     .doc(event.id)
@@ -131,37 +138,9 @@ class MyEventsScreen extends StatelessWidget {
                                 });
 
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Left event')),
-                                );
-                              },
-                            ),
-
-                          // Delete button (only for events created by user)
-                          if (isCreator)
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () async {
-                                // Delete event from events collection
-                                await FirebaseFirestore.instance
-                                    .collection('events')
-                                    .doc(event.id)
-                                    .delete();
-
-                                // Delete all related user_events entries
-                                final userEvents = await FirebaseFirestore
-                                    .instance
-                                    .collection('user_events')
-                                    .where('eventId', isEqualTo: event.id)
-                                    .get();
-
-                                for (var doc in userEvents.docs) {
-                                  await doc.reference.delete();
-                                }
-
-                                ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                      content:
-                                          Text('Event deleted successfully')),
+                                    content: Text('Left event'),
+                                  ),
                                 );
                               },
                             ),

@@ -2,12 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/event_model.dart';
-import 'create_event_screen.dart';
 import 'my_events_screen.dart';
+import 'create_event_screen.dart';
 import 'event_details_screen.dart';
+import 'user/profile_screen.dart';
+import 'user/community_screen.dart'; // Import CommunityScreen
 
-class DiscoverEventsScreen extends StatelessWidget {
+class DiscoverEventsScreen extends StatefulWidget {
   const DiscoverEventsScreen({super.key});
+
+  @override
+  State<DiscoverEventsScreen> createState() => _DiscoverEventsScreenState();
+}
+
+class _DiscoverEventsScreenState extends State<DiscoverEventsScreen> {
+  final Map<String, bool> _joinedEvents = {};
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +27,27 @@ class DiscoverEventsScreen extends StatelessWidget {
         title: const Text('Discover Events'),
         backgroundColor: const Color(0xFF4CAF50),
         actions: [
-          TextButton.icon(
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.forum), // 💬 Community icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CommunityScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
             onPressed: () {
               Navigator.push(
                 context,
@@ -26,24 +55,6 @@ class DiscoverEventsScreen extends StatelessWidget {
                     builder: (context) => const CreateEventScreen()),
               );
             },
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text(
-              'Create Event',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MyEventsScreen()),
-              );
-            },
-            icon: const Icon(Icons.event_available, color: Colors.white),
-            label: const Text(
-              'My Events',
-              style: TextStyle(color: Colors.white),
-            ),
           ),
         ],
       ),
@@ -66,33 +77,90 @@ class DiscoverEventsScreen extends StatelessWidget {
             return const Center(child: Text('No events available.'));
           }
 
-          return FutureBuilder<QuerySnapshot>(
-            future: currentUser == null
-                ? Future.value(null)
-                : FirebaseFirestore.instance
-                    .collection('user_events')
-                    .where('userId', isEqualTo: currentUser.uid)
-                    .get(),
-            builder: (context, joinedSnapshot) {
-              final joinedEventIds = <String>{};
-              if (joinedSnapshot.hasData && joinedSnapshot.data != null) {
-                joinedEventIds.addAll(joinedSnapshot.data!.docs
-                    .map((doc) => doc['eventId'].toString()));
-              }
+          return ListView.builder(
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
+              final isCreator =
+                  currentUser != null && event.creatorId == currentUser.uid;
+              final joined = _joinedEvents[event.id] ?? false;
 
-              return ListView.builder(
-                itemCount: events.length,
-                itemBuilder: (context, index) {
-                  final event = events[index];
-                  final isCreator =
-                      currentUser != null && event.creatorId == currentUser.uid;
-                  final isJoined = joinedEventIds.contains(event.id);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Event Image
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                EventDetailsScreen(event: event)),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        image:
+                            event.imageUrl != null && event.imageUrl!.isNotEmpty
+                                ? DecorationImage(
+                                    image: NetworkImage(event.imageUrl!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                        color: Colors.grey[300],
+                      ),
+                      child: event.imageUrl == null || event.imageUrl!.isEmpty
+                          ? const Icon(Icons.image,
+                              size: 60, color: Colors.white)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
-                  return Card(
-                    margin: const EdgeInsets.all(8),
+                  // Join Button & Volunteers/Points
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!isCreator && currentUser != null)
+                          ElevatedButton(
+                            onPressed: joined
+                                ? null
+                                : () async {
+                                    await _joinEvent(
+                                        context, event, currentUser.uid);
+                                    setState(() {
+                                      _joinedEvents[event.id] = true;
+                                    });
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: joined
+                                  ? Colors.grey
+                                  : const Color(0xFF4CAF50),
+                              minimumSize: const Size(double.infinity, 45),
+                            ),
+                            child: Text(joined ? 'Joined' : 'Join Event'),
+                          ),
+                        const SizedBox(height: 8),
+                        // Volunteers & Points
+                        Text(
+                          'Volunteers: ${event.volunteers}  |  Points: ${event.points}',
+                          style:
+                              const TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Event Details Card (Title & Description)
+                  Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: ListTile(
                       onTap: () {
-                        // Navigate to EventDetailsScreen
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -100,57 +168,12 @@ class DiscoverEventsScreen extends StatelessWidget {
                                   EventDetailsScreen(event: event)),
                         );
                       },
-                      // Image on the left
-                      leading: event.imageUrl != null &&
-                              event.imageUrl!.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                event.imageUrl!,
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child:
-                                  const Icon(Icons.image, color: Colors.white),
-                            ),
                       title: Text(event.title),
-                      subtitle: Text(
-                          'Volunteers: ${event.volunteers}  |  Points: ${event.points}'),
-                      trailing: currentUser == null
-                          ? null
-                          : isCreator
-                              ? null // Creator can't join their own event
-                              : isJoined
-                                  ? ElevatedButton(
-                                      onPressed: null,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.grey,
-                                      ),
-                                      child: const Text('Joined'),
-                                    )
-                                  : ElevatedButton(
-                                      onPressed: () async {
-                                        await _joinEvent(
-                                            context, event, currentUser.uid);
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            const Color(0xFF4CAF50),
-                                      ),
-                                      child: const Text('Join'),
-                                    ),
+                      subtitle: Text(event.description),
                     ),
-                  );
-                },
+                  ),
+                  const Divider(),
+                ],
               );
             },
           );
@@ -159,7 +182,7 @@ class DiscoverEventsScreen extends StatelessWidget {
     );
   }
 
-  // Join function that adds user to user_events in Firebase
+  // Join function
   Future<void> _joinEvent(
       BuildContext context, Event event, String userId) async {
     final eventId = event.id;
@@ -177,13 +200,12 @@ class DiscoverEventsScreen extends StatelessWidget {
       return;
     }
 
-    // Get user info
     final userDoc =
         await FirebaseFirestore.instance.collection('users').doc(userId).get();
     final userData = userDoc.data();
     if (userData == null) return;
 
-    // Add participant to user_events collection
+    // Add user to event
     await FirebaseFirestore.instance.collection('user_events').add({
       'userId': userId,
       'eventId': eventId,
@@ -193,12 +215,12 @@ class DiscoverEventsScreen extends StatelessWidget {
       'joinedAt': Timestamp.now(),
     });
 
-    // Update user points
+    // Increment user points
     await FirebaseFirestore.instance.collection('users').doc(userId).set({
       'points': FieldValue.increment(event.points),
     }, SetOptions(merge: true));
 
-    // Update event volunteers count
+    // Increment event volunteers
     await FirebaseFirestore.instance.collection('events').doc(eventId).update({
       'volunteers': FieldValue.increment(1),
     });
