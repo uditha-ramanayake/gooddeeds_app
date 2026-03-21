@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'register_screen.dart';
-import 'discover_events_screen.dart';
+import 'role_selection_screen.dart'; // Updated import
+// import 'discover_events_screen.dart'; // Removed because we now go through RoleSelectionScreen
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     try {
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
@@ -35,9 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text('Login successful! UID: ${user.uid}')),
         );
 
+        // Navigate to RoleSelectionScreen instead of DiscoverEventsScreen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DiscoverEventsScreen()),
+          MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -102,7 +105,8 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 labelText: 'Email',
                 prefixIcon: Icon(Icons.email),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               keyboardType: TextInputType.emailAddress,
             ),
@@ -112,7 +116,8 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: InputDecoration(
                 labelText: 'Password',
                 prefixIcon: Icon(Icons.lock),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               obscureText: true,
             ),
@@ -127,14 +132,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                 textStyle: TextStyle(fontSize: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: Text('Login'),
             ),
             SizedBox(height: 16),
             TextButton(
               onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const RegisterScreen()));
               },
               child: Text(
                 "Don't have an account? Register",

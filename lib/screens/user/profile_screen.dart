@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:gooddeeds_app/screens/organizer/organizer_dashboard_screen.dart';
 import 'edit_profile_screen.dart';
 import '../login_screen.dart'; // Make sure your login screen import is correct
 
@@ -42,7 +41,6 @@ class ProfileScreen extends StatelessWidget {
 
           final userName = userData['name'] ?? 'No Name';
           final email = userData['email'] ?? '';
-          final role = userData['role'] ?? 'user';
           final points = userData['points'] ?? 0;
           final imageUrl = userData['profileImage'] ?? '';
 
@@ -84,11 +82,10 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // 📊 Info Cards
+                // 📊 Info Card for Points only
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _infoCard('Role', role, Colors.blue),
                     _infoCard('Points', points.toString(), Colors.orange),
                   ],
                 ),
@@ -104,7 +101,6 @@ class ProfileScreen extends StatelessWidget {
                           currentName: userName,
                           currentEmail: email,
                           currentImageUrl: imageUrl,
-                          currentRole: role,
                         ),
                       ),
                     );
@@ -125,33 +121,10 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // 📊 Organizer Dashboard
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const OrganizerDashboardScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.dashboard),
-                  label: const Text('Organizer Dashboard'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
                 // 🚪 Logout
                 ElevatedButton.icon(
                   onPressed: () async {
                     await FirebaseAuth.instance.signOut();
-                    // Redirect to login screen and remove all previous routes
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(

@@ -9,14 +9,12 @@ class EditProfileScreen extends StatefulWidget {
   final String currentName;
   final String currentEmail;
   final String? currentImageUrl;
-  final String? currentRole;
 
   const EditProfileScreen({
     super.key,
     required this.currentName,
     required this.currentEmail,
     this.currentImageUrl,
-    this.currentRole,
   });
 
   @override
@@ -28,7 +26,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-  late TextEditingController _roleController;
 
   File? _imageFile;
   bool _loading = false;
@@ -41,14 +38,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.currentName);
     _emailController = TextEditingController(text: widget.currentEmail);
-    _roleController = TextEditingController(text: widget.currentRole ?? 'user');
     _currentImageUrl = widget.currentImageUrl;
   }
 
   // 📸 Pick Image
   Future<void> _pickImage() async {
-    final pickedFile =
-        await _picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
       setState(() {
@@ -93,7 +88,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     final newName = _nameController.text.trim();
-    final newRole = _roleController.text.trim();
 
     try {
       // ✅ Update Firestore ONLY (no email update)
@@ -102,7 +96,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           .doc(currentUser.uid)
           .set({
         'name': newName,
-        'role': newRole,
         'profileImage': imageUrl,
       }, SetOptions(merge: true));
 
@@ -134,7 +127,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _roleController.dispose();
     super.dispose();
   }
 
@@ -144,8 +136,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (_imageFile != null) {
       imageProvider = FileImage(_imageFile!);
-    } else if (_currentImageUrl != null &&
-        _currentImageUrl!.isNotEmpty) {
+    } else if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
       imageProvider = NetworkImage(_currentImageUrl!);
     }
 
@@ -183,10 +174,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         labelText: 'Name',
                         border: OutlineInputBorder(),
                       ),
-                      validator: (value) =>
-                          value == null || value.isEmpty
-                              ? 'Enter your name'
-                              : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Enter your name'
+                          : null,
                     ),
 
                     const SizedBox(height: 16),
@@ -201,28 +191,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
-
-                    // 🎭 Role
-                    TextFormField(
-                      controller: _roleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Role',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
                     const SizedBox(height: 32),
 
                     ElevatedButton(
                       onPressed: _saveProfile,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
-                        minimumSize:
-                            const Size(double.infinity, 50),
+                        minimumSize: const Size(double.infinity, 50),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: const Text('Save Changes'),
