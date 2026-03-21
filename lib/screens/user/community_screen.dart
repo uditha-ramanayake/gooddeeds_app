@@ -1,9 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -13,32 +10,15 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  final ImagePicker _picker = ImagePicker();
-  File? _selectedImage;
   final TextEditingController _postController = TextEditingController();
+  final TextEditingController _imageUrlController = TextEditingController();
+
   bool _loading = false;
-
-  // 📤 Upload image to Firebase Storage
-  Future<String?> _uploadImage(File file) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return null;
-
-      final ref = FirebaseStorage.instance.ref().child('post_images').child(
-          '${currentUser.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
-
-      final uploadTask = await ref.putFile(file);
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      print('Upload error: $e');
-      return null;
-    }
-  }
 
   // ➕ Create Post
   Future<void> _createPost() async {
-    if (_postController.text.trim().isEmpty && _selectedImage == null) return;
+    if (_postController.text.trim().isEmpty &&
+        _imageUrlController.text.trim().isEmpty) return;
 
     setState(() => _loading = true);
 
@@ -46,31 +26,35 @@ class _CommunityScreenState extends State<CommunityScreen> {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      String? imageUrl;
-      if (_selectedImage != null) {
-        imageUrl = await _uploadImage(_selectedImage!);
-      }
-
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(currentUser.uid)
           .get();
 
-      final userName = userDoc['name'] ?? 'User';
-      final userImage = userDoc['profileImage'] ?? '';
+      final userData = userDoc.data() as Map<String, dynamic>?;
+
+      final userName = userData != null && userData.containsKey('name')
+          ? userData['name']
+          : 'User';
+
+      final userImage = userData != null && userData.containsKey('profileImage')
+          ? userData['profileImage']
+          : '';
+
+      final imageUrl = _imageUrlController.text.trim();
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userId': currentUser.uid,
         'userName': userName,
         'userImage': userImage,
         'text': _postController.text.trim(),
-        'imageUrl': imageUrl ?? '',
+        'imageUrl': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
-        'likedBy': [], // new field for likes
+        'likedBy': [],
       });
 
       _postController.clear();
-      setState(() => _selectedImage = null);
+      _imageUrlController.clear();
 
       Navigator.pop(context);
     } catch (e) {
@@ -80,15 +64,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // 📸 Pick image
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() => _selectedImage = File(pickedFile.path));
-    }
-  }
-
-  // 💬 Show Create Post Modal
+  // 💬 Modal
   void _showCreatePostModal() {
     showModalBottomSheet(
       context: context,
@@ -103,6 +79,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 📝 Post text
                   TextField(
                     controller: _postController,
                     decoration: const InputDecoration(
@@ -111,24 +88,37 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                     maxLines: 3,
                   ),
+
                   const SizedBox(height: 10),
-                  if (_selectedImage != null)
+
+                  // 🔗 Image URL input
+                  TextField(
+                    controller: _imageUrlController,
+                    decoration: const InputDecoration(
+                      hintText: 'Paste image URL (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // 🔍 Preview image
+                  if (_imageUrlController.text.isNotEmpty)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        _selectedImage!,
+                      child: Image.network(
+                        _imageUrlController.text,
                         height: 200,
-                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Text("Invalid Image URL");
+                        },
                       ),
                     ),
+
                   const SizedBox(height: 10),
+
                   Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.photo),
-                        onPressed: _pickImage,
-                        color: const Color(0xFF4CAF50),
-                      ),
                       const Spacer(),
                       ElevatedButton(
                         onPressed: _loading ? null : _createPost,
@@ -186,7 +176,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
             physics: const BouncingScrollPhysics(),
             itemCount: posts.length,
             itemBuilder: (context, index) {
-              final data = posts[index];
+              final data = posts[index].data() as Map<String, dynamic>;
+
               final likedBy = List<String>.from(data['likedBy'] ?? []);
 
               final isLiked =
@@ -201,7 +192,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 👤 User info
+                      // 👤 User
                       Row(
                         children: [
                           CircleAvatar(
@@ -222,18 +213,29 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 10),
-                      // 📝 Post text
+
+                      // 📝 Text
                       Text(data['text'] ?? ''),
+
                       const SizedBox(height: 10),
-                      // 📸 Post image
+
+                      // 📸 Image
                       if (data['imageUrl'] != null && data['imageUrl'] != '')
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(data['imageUrl']),
+                          child: Image.network(
+                            data['imageUrl'],
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Text("Image failed to load");
+                            },
+                          ),
                         ),
+
                       const SizedBox(height: 10),
-                      // ❤️ Like button
+
+                      // ❤️ Like
                       Row(
                         children: [
                           IconButton(
@@ -246,7 +248,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
                               final postRef = FirebaseFirestore.instance
                                   .collection('posts')
-                                  .doc(data.id);
+                                  .doc(posts[index].id);
+
                               final postSnapshot = await postRef.get();
                               final likedBy = List<String>.from(
                                   postSnapshot['likedBy'] ?? []);
@@ -257,10 +260,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               }
                             },
                           ),
-                          Text(
-                              '${(data['likedBy'] as List?)?.length ?? 0} likes')
+                          Text('${likedBy.length} likes'),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
