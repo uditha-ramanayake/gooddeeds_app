@@ -19,7 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _register() async {
     try {
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
@@ -33,20 +34,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
+      // ✅ Updated Firestore structure
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'name': _nameController.text.trim(),
         'email': _emailController.text.trim(),
         'role': 'volunteer',
         'points': 0,
+
+        // Added fields (no UI impact)
+        'profileImage': '',
+        'followers': [],
+        'following': [],
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration successful! UID: ${user.uid}')),
+          SnackBar(content: Text('Registration successful!')),
         );
 
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (context) => const DiscoverEventsScreen()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const DiscoverEventsScreen()),
+        );
       }
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
@@ -82,16 +92,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(height: 80),
-              Text("GoodDeeds", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50))),
+              Text("GoodDeeds",
+                  style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4CAF50))),
               SizedBox(height: 8),
-              Text("Create your account", style: TextStyle(fontSize: 16, color: Colors.black54), textAlign: TextAlign.center),
+              Text("Create your account",
+                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                  textAlign: TextAlign.center),
               SizedBox(height: 40),
               TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: 'Full Name',
                   prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
               SizedBox(height: 16),
@@ -100,7 +117,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 decoration: InputDecoration(
                   labelText: 'Email',
                   prefixIcon: Icon(Icons.email),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
@@ -110,30 +128,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 obscureText: true,
               ),
               SizedBox(height: 8),
-              if (_errorMessage.isNotEmpty) Text(_errorMessage, style: TextStyle(color: Colors.red)),
+              if (_errorMessage.isNotEmpty)
+                Text(_errorMessage, style: TextStyle(color: Colors.red)),
               SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _register,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF4CAF50),
                   foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                   textStyle: TextStyle(fontSize: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text('Register'),
               ),
               SizedBox(height: 16),
               TextButton(
                 onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LoginScreen()));
                 },
-                child: Text("Already have an account? Login", style: TextStyle(color: Color(0xFF4CAF50))),
+                child: Text("Already have an account? Login",
+                    style: TextStyle(color: Color(0xFF4CAF50))),
               ),
               SizedBox(height: 40),
             ],

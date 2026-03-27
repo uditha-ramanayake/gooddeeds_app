@@ -1,9 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final String currentName;
@@ -26,49 +23,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   late TextEditingController _nameController;
   late TextEditingController _emailController;
+  late TextEditingController _imageUrlController;
 
-  File? _imageFile;
   bool _loading = false;
   String? _currentImageUrl;
-
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.currentName);
     _emailController = TextEditingController(text: widget.currentEmail);
+    _imageUrlController =
+        TextEditingController(text: widget.currentImageUrl ?? '');
     _currentImageUrl = widget.currentImageUrl;
-  }
-
-  // 📸 Pick Image
-  Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
-    }
-  }
-
-  // ☁️ Upload Image to Firebase Storage
-  Future<String?> _uploadImage(File file) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return null;
-
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child('${currentUser.uid}.jpg');
-
-      await ref.putFile(file);
-      return await ref.getDownloadURL();
-    } catch (e) {
-      print('Upload error: $e');
-      return null;
-    }
   }
 
   // 💾 Save Profile
@@ -80,17 +47,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    String? imageUrl = _currentImageUrl;
-
-    // Upload new image if selected
-    if (_imageFile != null) {
-      imageUrl = await _uploadImage(_imageFile!);
-    }
-
     final newName = _nameController.text.trim();
+    final imageUrl = _imageUrlController.text.trim();
 
     try {
-      // ✅ Update Firestore ONLY (no email update)
+      // ✅ Update Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(currentUser.uid)
@@ -113,7 +74,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SnackBar(content: Text('Profile updated successfully')),
       );
 
-      Navigator.pop(context, true); // 🔥 important for refresh
+      Navigator.pop(context, true);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
@@ -127,6 +88,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
@@ -134,8 +96,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     ImageProvider? imageProvider;
 
-    if (_imageFile != null) {
-      imageProvider = FileImage(_imageFile!);
+    if (_imageUrlController.text.isNotEmpty) {
+      imageProvider = NetworkImage(_imageUrlController.text);
     } else if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
       imageProvider = NetworkImage(_currentImageUrl!);
     }
@@ -153,18 +115,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey[300],
-                        backgroundImage: imageProvider,
-                        child: imageProvider == null
-                            ? const Icon(Icons.camera_alt,
-                                size: 40, color: Colors.white)
-                            : null,
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: imageProvider,
+                      child: imageProvider == null
+                          ? const Icon(Icons.person,
+                              size: 40, color: Colors.white)
+                          : null,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 🖼️ Image URL input
+                    TextFormField(
+                      controller: _imageUrlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Profile Image URL',
+                        border: OutlineInputBorder(),
                       ),
                     ),
+
                     const SizedBox(height: 16),
 
                     // 👤 Name
@@ -198,9 +169,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
                         minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
                       child: const Text('Save Changes'),
                     ),

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'register_screen.dart';
-import 'role_selection_screen.dart'; // Updated import
-// import 'discover_events_screen.dart'; // Removed because we now go through RoleSelectionScreen
+import 'role_selection_screen.dart'; // Navigate here after login
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     try {
+      // 🔑 Sign in user
       UserCredential userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -25,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       User? user = userCredential.user;
+
       if (user == null) {
         setState(() {
           _errorMessage = 'Login failed: User is null';
@@ -37,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text('Login successful! UID: ${user.uid}')),
         );
 
-        // Navigate to RoleSelectionScreen instead of DiscoverEventsScreen
+        // ✅ Navigate to RoleSelectionScreen after login
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
