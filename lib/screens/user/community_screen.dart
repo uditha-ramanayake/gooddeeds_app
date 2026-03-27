@@ -15,10 +15,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
   final TextEditingController _imageUrlController = TextEditingController();
   bool _loading = false;
 
-  // Create Post
+  String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  // CREATE POST
   Future<void> _createPost() async {
     if (_postController.text.trim().isEmpty &&
-        _imageUrlController.text.trim().isEmpty) return;
+        _imageUrlController.text.trim().isEmpty) {
+      return;
+    }
 
     setState(() => _loading = true);
 
@@ -44,7 +48,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Modal to create post
+  // CREATE POST MODAL
   void _showCreatePostModal() {
     showModalBottomSheet(
       context: context,
@@ -123,10 +127,33 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
+  // FOLLOW / UNFOLLOW USER
+  Future<void> _toggleFollow(String userId) async {
+    if (currentUserId.isEmpty) return;
+
+    final followersRef = FirebaseFirestore.instance.collection('followers');
+    final query = await followersRef
+        .where('followerId', isEqualTo: currentUserId)
+        .where('followingId', isEqualTo: userId)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      // Unfollow
+      for (var doc in query.docs) {
+        await followersRef.doc(doc.id).delete();
+      }
+    } else {
+      // Follow
+      await followersRef.add({
+        'followerId': currentUserId,
+        'followingId': userId,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final currentUser = FirebaseAuth.instance.currentUser;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
@@ -143,7 +170,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
           }
 
           final posts = snapshot.data!.docs;
-
           if (posts.isEmpty) {
             return const Center(child: Text('No posts yet.'));
           }
@@ -153,9 +179,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
             itemCount: posts.length,
             itemBuilder: (context, index) {
               final data = posts[index].data() as Map<String, dynamic>;
+              final postId = posts[index].id;
+              final postOwnerId = data['userId'];
               final likedBy = List<String>.from(data['likedBy'] ?? []);
-              final isLiked =
-                  currentUser != null && likedBy.contains(currentUser.uid);
+              final isLiked = likedBy.contains(currentUserId);
 
               return Card(
                 margin: const EdgeInsets.all(10),
@@ -166,60 +193,94 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // User info
+                      // USER INFO + FOLLOW BUTTON
                       FutureBuilder<DocumentSnapshot>(
                         future: FirebaseFirestore.instance
                             .collection('users')
-                            .doc(data['userId'])
+                            .doc(postOwnerId)
                             .get(),
                         builder: (context, userSnapshot) {
                           if (!userSnapshot.hasData) return const SizedBox();
-
-                          final docSnapshot = userSnapshot.data;
-                          if (docSnapshot == null || !docSnapshot.exists) {
-                            return const SizedBox();
-                          }
-
-                          final userData =
-                              docSnapshot.data() as Map<String, dynamic>? ?? {};
+                          final userData = userSnapshot.data!.data()
+                                  as Map<String, dynamic>? ??
+                              {};
                           final userName = userData['name'] ?? 'User';
                           final userImage = userData['profileImage'] ?? '';
 
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => UserProfileScreenCommunity(
-                                      userId: data['userId']),
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          UserProfileScreenCommunity(
+                                              userId: postOwnerId),
+                                    ),
+                                  );
+                                },
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundImage: userImage.isNotEmpty
+                                          ? NetworkImage(userImage)
+                                          : null,
+                                      child: userImage.isEmpty
+                                          ? const Icon(Icons.person)
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      userName,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundImage: userImage.isNotEmpty
-                                      ? NetworkImage(userImage)
-                                      : null,
-                                  child: userImage.isEmpty
-                                      ? const Icon(Icons.person)
-                                      : null,
+                              ),
+                              // FOLLOW BUTTON STREAM
+                              if (currentUserId != postOwnerId)
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('followers')
+                                      .where('followerId',
+                                          isEqualTo: currentUserId)
+                                      .where('followingId',
+                                          isEqualTo: postOwnerId)
+                                      .snapshots(),
+                                  builder: (context, followSnapshot) {
+                                    final isFollowing =
+                                        followSnapshot.data?.docs.isNotEmpty ??
+                                            false;
+                                    return ElevatedButton(
+                                      onPressed: () =>
+                                          _toggleFollow(postOwnerId),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isFollowing
+                                            ? Colors.grey[300]
+                                            : Colors.blue,
+                                        foregroundColor: isFollowing
+                                            ? Colors.black
+                                            : Colors.white,
+                                      ),
+                                      child: Text(
+                                          isFollowing ? 'Following' : 'Follow'),
+                                    );
+                                  },
                                 ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  userName,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
+                            ],
                           );
                         },
                       ),
                       const SizedBox(height: 10),
-                      Text(data['text'] ?? ''),
+                      // POST TEXT
+                      if (data['text'] != null && data['text'] != '')
+                        Text(data['text']),
                       const SizedBox(height: 10),
+                      // POST IMAGE
                       if (data['imageUrl'] != null && data['imageUrl'] != '')
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
@@ -231,35 +292,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           ),
                         ),
                       const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              isLiked ? Icons.favorite : Icons.favorite_border,
-                              color: Colors.red,
-                            ),
-                            onPressed: () async {
-                              if (currentUser == null) return;
-
-                              final postRef = FirebaseFirestore.instance
-                                  .collection('posts')
-                                  .doc(posts[index].id);
-
-                              final postSnapshot = await postRef.get();
-                              final likedBy =
-                                  List<String>.from(postSnapshot['likedBy'] ?? []);
-
-                              if (isLiked) {
-                                likedBy.remove(currentUser.uid);
-                              } else {
-                                likedBy.add(currentUser.uid);
-                              }
-
-                              await postRef.update({'likedBy': likedBy});
-                            },
-                          ),
-                          Text('${likedBy.length} likes'),
-                        ],
+                      // COMMENT & LIKE SECTION
+                      CommentLikeSection(
+                        postId: postId,
+                        isLiked: isLiked,
+                        likedBy: likedBy,
+                        postOwnerId: postOwnerId,
                       ),
                     ],
                   ),
@@ -274,6 +312,189 @@ class _CommunityScreenState extends State<CommunityScreen> {
         backgroundColor: const Color(0xFF4CAF50),
         child: const Icon(Icons.add),
       ),
+    );
+  }
+}
+
+// COMMENT & LIKE SECTION
+class CommentLikeSection extends StatefulWidget {
+  final String postId;
+  final bool isLiked;
+  final List<String> likedBy;
+  final String postOwnerId;
+
+  const CommentLikeSection({
+    super.key,
+    required this.postId,
+    required this.isLiked,
+    required this.likedBy,
+    required this.postOwnerId,
+  });
+
+  @override
+  State<CommentLikeSection> createState() => _CommentLikeSectionState();
+}
+
+class _CommentLikeSectionState extends State<CommentLikeSection> {
+  final TextEditingController _commentController = TextEditingController();
+  bool isLiked = false;
+  List<String> likedBy = [];
+
+  @override
+  void initState() {
+    super.initState();
+    isLiked = widget.isLiked;
+    likedBy = widget.likedBy;
+  }
+
+  Future<void> _toggleLike() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final postRef =
+        FirebaseFirestore.instance.collection('posts').doc(widget.postId);
+
+    if (isLiked) {
+      likedBy.remove(currentUser.uid);
+    } else {
+      likedBy.add(currentUser.uid);
+    }
+
+    await postRef.update({'likedBy': likedBy});
+    setState(() => isLiked = !isLiked);
+  }
+
+  Future<void> _submitComment() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+    if (_commentController.text.trim().isEmpty) return;
+
+    await FirebaseFirestore.instance
+        .collection('posts')
+        .doc(widget.postId)
+        .collection('comments')
+        .add({
+      'userId': currentUser.uid,
+      'text': _commentController.text.trim(),
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    _commentController.clear();
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    await FirebaseFirestore.instance
+        .collection('posts')
+        .doc(widget.postId)
+        .collection('comments')
+        .doc(commentId)
+        .delete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _commentController,
+                decoration: const InputDecoration(
+                  hintText: 'Add a comment...',
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.send, size: 20),
+              onPressed: _submitComment,
+            ),
+            IconButton(
+              icon: Icon(
+                isLiked ? Icons.favorite : Icons.favorite_border,
+                color: Colors.red,
+              ),
+              onPressed: _toggleLike,
+            ),
+          ],
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('${likedBy.length} likes',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 6),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('posts')
+              .doc(widget.postId)
+              .collection('comments')
+              .orderBy('timestamp', descending: false)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SizedBox();
+
+            final comments = snapshot.data!.docs;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: comments.map((commentDoc) {
+                final commentData =
+                    commentDoc.data() as Map<String, dynamic>? ?? {};
+                final commentId = commentDoc.id;
+                return FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(commentData['userId'])
+                      .get(),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) return const SizedBox();
+                    final userData =
+                        userSnapshot.data!.data() as Map<String, dynamic>? ??
+                            {};
+                    final userName = userData['name'] ?? 'User';
+                    final canDelete = currentUser != null &&
+                        (currentUser.uid == commentData['userId'] ||
+                            currentUser.uid == widget.postOwnerId);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                      text: '$userName ',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black)),
+                                  TextSpan(
+                                      text: commentData['text'] ?? '',
+                                      style:
+                                          const TextStyle(color: Colors.black)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (canDelete)
+                            IconButton(
+                              icon: const Icon(Icons.delete, size: 18),
+                              onPressed: () => _deleteComment(commentId),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 }
