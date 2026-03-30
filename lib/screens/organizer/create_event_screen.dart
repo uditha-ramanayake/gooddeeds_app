@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../user/discover_events_screen.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -31,7 +30,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           return;
         }
 
-        // Add event to Firestore with creatorId
+        // Add event to Firestore
         await FirebaseFirestore.instance.collection('events').add({
           'title': _titleController.text.trim(),
           'description': _descriptionController.text.trim(),
@@ -41,17 +40,17 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           'points': int.tryParse(_pointsController.text.trim()) ?? 0,
           'volunteers': 0,
           'createdAt': Timestamp.now(),
-          'creatorId': currentUser.uid, // ✅ added creatorId
+          'creatorId': currentUser.uid,
         });
 
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Event Created Successfully')),
         );
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DiscoverEventsScreen()),
-        );
+        // Go back to Organizer Dashboard
+        Navigator.pop(context);
+
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create event: $e')),
@@ -183,4 +182,3 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 }
-

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'edit_profile_screen.dart';
+import 'post_feed_screen.dart'; // <-- Separate PostFeedScreen
 
+// ---------------- USER PROFILE SCREEN ----------------
 class UserProfileScreenCommunity extends StatefulWidget {
   final String userId;
 
@@ -17,6 +20,7 @@ class _UserProfileScreenCommunityState
   String userName = 'User';
   String userImage = '';
   int totalPoints = 0;
+  String bio = '';
   String currentUserId = '';
 
   @override
@@ -28,9 +32,7 @@ class _UserProfileScreenCommunityState
 
   void _loadCurrentUser() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      currentUserId = user.uid;
-    }
+    if (user != null) currentUserId = user.uid;
   }
 
   Future<void> _loadUserData() async {
@@ -45,11 +47,11 @@ class _UserProfileScreenCommunityState
         userName = data['name'] ?? 'User';
         userImage = data['profileImage'] ?? '';
         totalPoints = data['points'] ?? 0;
+        bio = data['bio'] ?? '';
       });
     }
   }
 
-  // STREAMS FOR REAL-TIME UPDATES
   Stream<int> _followersCountStream() {
     return FirebaseFirestore.instance
         .collection('followers')
@@ -86,12 +88,8 @@ class _UserProfileScreenCommunityState
         .get();
 
     if (query.docs.isNotEmpty) {
-      // Unfollow
-      for (var doc in query.docs) {
-        await followersRef.doc(doc.id).delete();
-      }
+      for (var doc in query.docs) await followersRef.doc(doc.id).delete();
     } else {
-      // Follow
       await followersRef.add({
         'followerId': currentUserId,
         'followingId': widget.userId,
@@ -108,6 +106,31 @@ class _UserProfileScreenCommunityState
           userId: widget.userId,
           type: type,
         ),
+      ),
+    );
+  }
+
+  Future<void> _goToEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(
+          currentName: userName,
+          currentEmail: FirebaseAuth.instance.currentUser?.email ?? '',
+          currentImageUrl: userImage,
+          currentBio: bio,
+        ),
+      ),
+    );
+
+    if (result == true) _loadUserData();
+  }
+
+  void _openPostFeed() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostFeedScreen(userId: widget.userId),
       ),
     );
   }
@@ -141,12 +164,31 @@ class _UserProfileScreenCommunityState
           const SizedBox(height: 4),
           Center(
             child: Text(
+              bio,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (currentUserId == widget.userId)
+            Center(
+              child: ElevatedButton(
+                onPressed: _goToEditProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Edit Profile'),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
               'Points: $totalPoints',
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ),
-          const SizedBox(height: 12),
-          // FOLLOW BUTTON
+          const SizedBox(height: 16),
           if (currentUserId != widget.userId)
             StreamBuilder<bool>(
               stream: _isFollowingStream(),
@@ -156,8 +198,10 @@ class _UserProfileScreenCommunityState
                   child: ElevatedButton(
                     onPressed: _toggleFollow,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isFollowing ? Colors.grey[300] : Colors.blue,
-                      foregroundColor: isFollowing ? Colors.black : Colors.white,
+                      backgroundColor:
+                          isFollowing ? Colors.grey[300] : Colors.blue,
+                      foregroundColor:
+                          isFollowing ? Colors.black : Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
@@ -167,7 +211,6 @@ class _UserProfileScreenCommunityState
               },
             ),
           const SizedBox(height: 16),
-          // FOLLOWERS / FOLLOWING / POSTS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -212,13 +255,16 @@ class _UserProfileScreenCommunityState
                     .snapshots(),
                 builder: (context, snapshot) {
                   final count = snapshot.data?.docs.length ?? 0;
-                  return Column(
-                    children: [
-                      Text('$count',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 18)),
-                      const Text('Posts'),
-                    ],
+                  return GestureDetector(
+                    onTap: _openPostFeed,
+                    child: Column(
+                      children: [
+                        Text('$count',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18)),
+                        const Text('Posts'),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -226,7 +272,6 @@ class _UserProfileScreenCommunityState
           ),
           const SizedBox(height: 16),
           const Divider(),
-          // POSTS GRID
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('posts')
@@ -234,20 +279,16 @@ class _UserProfileScreenCommunityState
                 .orderBy('timestamp', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
-
               final posts = snapshot.data!.docs;
-
-              if (posts.isEmpty) {
+              if (posts.isEmpty)
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.all(20),
                     child: Text('No posts yet.'),
                   ),
                 );
-              }
 
               return GridView.builder(
                 shrinkWrap: true,
@@ -262,14 +303,9 @@ class _UserProfileScreenCommunityState
                 itemBuilder: (context, index) {
                   final data = posts[index].data() as Map<String, dynamic>;
                   return GestureDetector(
-                    onTap: () {
-                      // Open post details (likes, comments)
-                    },
+                    onTap: _openPostFeed,
                     child: data['imageUrl'] != null && data['imageUrl'] != ''
-                        ? Image.network(
-                            data['imageUrl'],
-                            fit: BoxFit.cover,
-                          )
+                        ? Image.network(data['imageUrl'], fit: BoxFit.cover)
                         : Container(
                             color: Colors.grey[300],
                             child: const Icon(Icons.image, size: 50),
@@ -285,10 +321,10 @@ class _UserProfileScreenCommunityState
   }
 }
 
-// SCREEN FOR FOLLOWERS / FOLLOWING LIST
+// ---------------- FOLLOWERS / FOLLOWING ----------------
 class FollowersFollowingListScreen extends StatelessWidget {
   final String userId;
-  final String type; // 'followers' or 'following'
+  final String type;
 
   const FollowersFollowingListScreen(
       {super.key, required this.userId, required this.type});
@@ -306,15 +342,11 @@ class FollowersFollowingListScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: stream,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (!snapshot.hasData)
             return const Center(child: CircularProgressIndicator());
-          }
 
           final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) {
-            return const Center(child: Text('No users found.'));
-          }
+          if (docs.isEmpty) return const Center(child: Text('No users found.'));
 
           return ListView.builder(
             itemCount: docs.length,
@@ -330,9 +362,9 @@ class FollowersFollowingListScreen extends StatelessWidget {
                     .doc(otherUserId)
                     .get(),
                 builder: (context, userSnapshot) {
-                  if (!userSnapshot.hasData) {
+                  if (!userSnapshot.hasData)
                     return const ListTile(title: Text('Loading...'));
-                  }
+
                   final userData =
                       userSnapshot.data!.data() as Map<String, dynamic>;
                   return ListTile(
@@ -366,6 +398,7 @@ class FollowersFollowingListScreen extends StatelessWidget {
   }
 }
 
+// ---------------- STRING EXTENSION ----------------
 extension StringExtension on String {
   String capitalize() =>
       length > 0 ? '${this[0].toUpperCase()}${substring(1)}' : '';

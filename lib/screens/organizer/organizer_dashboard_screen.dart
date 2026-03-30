@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'manage_event_screen.dart'; // We'll build this next
+import 'manage_event_screen.dart';
+import 'create_event_screen.dart'; // Import the create event screen
 
 class OrganizerDashboardScreen extends StatelessWidget {
   const OrganizerDashboardScreen({super.key});
@@ -26,9 +27,26 @@ class OrganizerDashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Organizer Dashboard'),
         backgroundColor: const Color(0xFF4CAF50),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Create Event',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreateEventScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('events').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('events')
+            .where('creatorId', isEqualTo: currentUser.uid)
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -38,21 +56,20 @@ class OrganizerDashboardScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Filter events created by current user
-          final List events = snapshot.data!.docs
-              .where((doc) => doc['creatorId'] == currentUser.uid)
-              .toList();
+          final events = snapshot.data!.docs;
 
           if (events.isEmpty) {
-            return const Center(child: Text('You have not created any events.'));
+            return const Center(
+              child: Text('You have not created any events.'),
+            );
           }
 
           return ListView.builder(
             itemCount: events.length,
             itemBuilder: (context, index) {
               final event = events[index];
-              final eventId = event.id;
               final eventData = event.data() as Map<String, dynamic>;
+              final eventId = event.id;
 
               return Card(
                 margin: const EdgeInsets.all(8),
@@ -66,7 +83,8 @@ class OrganizerDashboardScreen extends StatelessWidget {
                     children: [
                       // Manage button
                       IconButton(
-                        icon: const Icon(Icons.manage_accounts, color: Colors.blue),
+                        icon: const Icon(Icons.manage_accounts,
+                            color: Colors.blue),
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -83,7 +101,29 @@ class OrganizerDashboardScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () async {
-                          // Delete the event
+                          bool confirm = false;
+                          confirm = await showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Confirm Delete'),
+                              content: const Text(
+                                  'Are you sure you want to delete this event?'),
+                              actions: [
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel')),
+                                TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: const Text('Delete')),
+                              ],
+                            ),
+                          );
+
+                          if (!confirm) return;
+
+                          // Delete event
                           await FirebaseFirestore.instance
                               .collection('events')
                               .doc(eventId)
@@ -100,7 +140,8 @@ class OrganizerDashboardScreen extends StatelessWidget {
                           }
 
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Event deleted successfully')),
+                            const SnackBar(
+                                content: Text('Event deleted successfully')),
                           );
                         },
                       ),

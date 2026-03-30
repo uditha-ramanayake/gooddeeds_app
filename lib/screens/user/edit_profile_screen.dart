@@ -6,12 +6,14 @@ class EditProfileScreen extends StatefulWidget {
   final String currentName;
   final String currentEmail;
   final String? currentImageUrl;
+  final String? currentBio; // NEW
 
   const EditProfileScreen({
     super.key,
     required this.currentName,
     required this.currentEmail,
     this.currentImageUrl,
+    this.currentBio, // NEW
   });
 
   @override
@@ -24,6 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _imageUrlController;
+  late TextEditingController _bioController; // NEW
 
   bool _loading = false;
   String? _currentImageUrl;
@@ -35,10 +38,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _emailController = TextEditingController(text: widget.currentEmail);
     _imageUrlController =
         TextEditingController(text: widget.currentImageUrl ?? '');
+    _bioController =
+        TextEditingController(text: widget.currentBio ?? ''); // NEW
     _currentImageUrl = widget.currentImageUrl;
   }
 
-  // 💾 Save Profile
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -49,6 +53,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     final newName = _nameController.text.trim();
     final imageUrl = _imageUrlController.text.trim();
+    final bio = _bioController.text.trim(); // NEW
 
     try {
       // ✅ Update Firestore
@@ -58,17 +63,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           .set({
         'name': newName,
         'profileImage': imageUrl,
+        'bio': bio, // NEW
       }, SetOptions(merge: true));
-
-      // ✅ Update name in user_events
-      final userEvents = await FirebaseFirestore.instance
-          .collection('user_events')
-          .where('userId', isEqualTo: currentUser.uid)
-          .get();
-
-      for (var doc in userEvents.docs) {
-        await doc.reference.update({'name': newName});
-      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully')),
@@ -89,6 +85,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _imageUrlController.dispose();
+    _bioController.dispose(); // NEW
     super.dispose();
   }
 
@@ -105,7 +102,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
-        backgroundColor: Color(0xFF4CAF50),
+        backgroundColor: const Color(0xFF4CAF50),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -124,7 +121,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               size: 40, color: Colors.white)
                           : null,
                     ),
-
                     const SizedBox(height: 16),
 
                     // 🖼️ Image URL input
@@ -135,7 +131,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-
                     const SizedBox(height: 16),
 
                     // 👤 Name
@@ -149,7 +144,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ? 'Enter your name'
                           : null,
                     ),
+                    const SizedBox(height: 16),
 
+                    // 📝 Bio
+                    TextFormField(
+                      controller: _bioController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Add a bio',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
                     const SizedBox(height: 16),
 
                     // 📧 Email (READ ONLY)
@@ -161,7 +166,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-
                     const SizedBox(height: 32),
 
                     ElevatedButton(

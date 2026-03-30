@@ -241,7 +241,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   ],
                                 ),
                               ),
-                              // FOLLOW BUTTON STREAM
                               if (currentUserId != postOwnerId)
                                 StreamBuilder<QuerySnapshot>(
                                   stream: FirebaseFirestore.instance
@@ -391,6 +390,61 @@ class _CommentLikeSectionState extends State<CommentLikeSection> {
         .delete();
   }
 
+  // NEW: SHOW LIKED USERS
+  void _showLikedUsers() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        if (likedBy.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Text("No likes yet"),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: likedBy.length,
+          itemBuilder: (context, index) {
+            final userId = likedBy[index];
+
+            return FutureBuilder<DocumentSnapshot>(
+              future: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId)
+                  .get(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const SizedBox();
+
+                final userData =
+                    snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                final userName = userData['name'] ?? 'User';
+                final userImage = userData['profileImage'] ?? '';
+
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage:
+                        userImage.isNotEmpty ? NetworkImage(userImage) : null,
+                    child: userImage.isEmpty ? const Icon(Icons.person) : null,
+                  ),
+                  title: Text(userName),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            UserProfileScreenCommunity(userId: userId),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -421,10 +475,17 @@ class _CommentLikeSectionState extends State<CommentLikeSection> {
             ),
           ],
         ),
+        // CLICKABLE LIKES COUNT
         Align(
           alignment: Alignment.centerLeft,
-          child: Text('${likedBy.length} likes',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          child: GestureDetector(
+            onTap: _showLikedUsers,
+            child: Text(
+              '${likedBy.length} likes',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+          ),
         ),
         const SizedBox(height: 6),
         StreamBuilder<QuerySnapshot>(
